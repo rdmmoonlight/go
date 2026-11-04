@@ -107,7 +107,7 @@ func main() {
 
 	// 8. Jalankan Server di Goroutine terpisah
 	go func() {
-		log.Printf("Listening on %s (env=%s)", addr, env)
+		log.Printf("Server listening on %s (env=%s)", addr, env)
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Fatalf("Server HTTP crash: %v", err)
 		}
@@ -118,7 +118,7 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
-	log.Println("Shutting down auth service gracefully...")
+	log.Println("Shutting down server gracefully...")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -127,5 +127,5 @@ func main() {
 		log.Fatalf("Server dipaksa berhenti: %v", err)
 	}
 
-	log.Println("Auth service berhenti dengan aman.")
+	log.Println("Server berhenti dengan aman.")
 }
