@@ -2,9 +2,21 @@ package store
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
+	"fmt"
 	"strings"
 	"sync"
 )
+
+// newID membuat string ID acak 16 byte (32 karakter hex) untuk pengganti generator ID Postgres.
+func newID() string {
+	b := make([]byte, 16)
+	if _, err := rand.Read(b); err != nil {
+		return fmt.Sprintf("%d", rand.Reader)
+	}
+	return hex.EncodeToString(b)
+}
 
 // MemoryStore adalah implementasi dalam memori untuk tes unit.
 // Jangan dipakai di cmd/server: data hilang saat restart.

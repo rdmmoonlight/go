@@ -72,19 +72,12 @@ func main() {
 		origins = append(origins, o)
 	}
 
-	// 5. Database wajib: auth tidak boleh berjalan tanpa penyimpanan permanen.
-	dsn := strings.TrimSpace(os.Getenv("DATABASE_URL"))
-	if dsn == "" {
-		log.Fatal("DATABASE_URL wajib diisi: layanan auth tidak berjalan tanpa database")
-	}
-	dbCtx, dbCancel := context.WithTimeout(context.Background(), 60*time.Second)
-	users, err := store.OpenPostgres(dbCtx, dsn)
-	dbCancel()
+	// 5. Inisialisasi Database SQLite Lokal
+	users, err := store.NewSQLiteStore("app.db")
 	if err != nil {
-		log.Fatalf("Gagal menyiapkan database: %v", err)
+		log.Fatalf("Gagal menyiapkan database SQLite: %v", err)
 	}
-	defer users.Close()
-	log.Println("Database terhubung, skema auth siap")
+	log.Println("Database SQLite terhubung (app.db)")
 
 	// 6. Inisialisasi Handler & Dependencies
 	h := handlers.New(
@@ -114,20 +107,19 @@ func main() {
 
 	// 8. Jalankan Server di Goroutine terpisah
 	go func() {
-		log.Printf("Auth service listening on %s (env=%s)", addr, env)
+		log.Printf("Listening on %s (env=%s)", addr, env)
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Fatalf("Server HTTP crash: %v", err)
 		}
 	}()
 
-	// 9. Graceful Shutdown listener (menunggu sinyal SIGINT / SIGTERM dari OS/Docker)
+	// 9. Graceful Shutdown listener
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
 	log.Println("Shutting down auth service gracefully...")
 
-	// Beri waktu 10 detik untuk menyelesaikan in-flight HTTP requests
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
