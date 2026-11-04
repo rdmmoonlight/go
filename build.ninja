@@ -1,0 +1,9 @@
+rule go_build
+  command = go build -C backend/go -o bin/app cmd/server/main.go
+  description = Building Go App: $in
+  pool = console
+
+build backend/go/bin/app: go_build backend/go/cmd/server/main.go
+  implicit = backend/go/go.mod
+
+build backend_go: phony backend/go/bin/app

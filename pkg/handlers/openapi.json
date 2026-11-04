@@ -1,0 +1,215 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Auth Service API",
+    "description": "Layanan autentikasi berbasis Go untuk pengelolaan sesi, validasi token, dan identitas pengguna.",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8080",
+      "description": "Local Development Server"
+    }
+  ],
+  "paths": {
+    "/auth/register": {
+      "post": {
+        "summary": "Registrasi Pengguna Baru",
+        "tags": ["Authentication"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Registrasi berhasil",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validasi input gagal atau email sudah terdaftar"
+          }
+        }
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "summary": "Login Pengguna",
+        "tags": ["Authentication"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Login berhasil",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Kredensial tidak valid"
+          }
+        }
+      }
+    },
+    "/auth/validate": {
+      "get": {
+        "summary": "Validasi Internal Sesi / Token (Digunakan Nginx auth_request)",
+        "tags": ["Internal Auth"],
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Authorization",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Bearer Token atau Cookie Sesi"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Token valid",
+            "headers": {
+              "X-User-Id": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "ID Pengguna yang tervalidasi"
+              }
+            }
+          },
+          "401": {
+            "description": "Token tidak valid atau kadaluwarsa"
+          }
+        }
+      }
+    },
+    "/auth/me": {
+      "get": {
+        "summary": "Ambil Profil Pengguna Saat Ini",
+        "tags": ["User Profile"],
+        "responses": {
+          "200": {
+            "description": "Detail profil pengguna",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserProfile"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "summary": "Logout Pengguna",
+        "tags": ["Authentication"],
+        "responses": {
+          "200": {
+            "description": "Logout berhasil"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "RegisterRequest": {
+        "type": "object",
+        "required": ["email", "password", "name"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Ghofur"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "example": "ghofur@example.com"
+          },
+          "password": {
+            "type": "string",
+            "format": "password",
+            "example": "Secret123!"
+          }
+        }
+      },
+      "LoginRequest": {
+        "type": "object",
+        "required": ["email", "password"],
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "example": "ghofur@example.com"
+          },
+          "password": {
+            "type": "string",
+            "format": "password",
+            "example": "Secret123!"
+          }
+        }
+      },
+      "UserProfile": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "usr_981273918"
+          },
+          "name": {
+            "type": "string",
+            "example": "Ghofur"
+          },
+          "email": {
+            "type": "string",
+            "example": "ghofur@example.com"
+          }
+        }
+      },
+      "AuthResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "message": {
+            "type": "string",
+            "example": "Autentikasi berhasil"
+          },
+          "data": {
+            "$ref": "#/components/schemas/UserProfile"
+          }
+        }
+      }
+    }
+  }
+}
