@@ -2,42 +2,54 @@ package handlers
 
 import (
 	_ "embed"
-	"net/http"
+
+	"github.com/gofiber/fiber/v3"
 )
 
 //go:embed openapi.json
 var openAPISpec []byte
 
-func (h *Handler) Routes() http.Handler {
-	mux := http.NewServeMux()
-
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/" {
-			http.NotFound(w, r)
-			return
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"service":"auth-service","status":"ok"}`))
+// RegisterRoutes mendaftarkan seluruh endpoint aplikasi ke router Fiber v3
+func (h *Handler) RegisterRoutes(app *fiber.App) {
+	// Root endpoint
+	app.Get("/", func(c fiber.Ctx) error {
+		return c.Status(fiber.StatusOK).JSON(fiber.Map{
+			"service": "auth-service",
+			"status":  "ok",
+		})
 	})
 
-	mux.HandleFunc("/openapi.json", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		w.WriteHeader(http.StatusOK)
-		w.Write(openAPISpec)
+	// OpenAPI Spec endpoint
+	app.Get("/openapi.json", func(c fiber.Ctx) error {
+		c.Set(fiber.HeaderContentType, "application/json; charset=utf-8")
+		return c.Status(fiber.StatusOK).Send(openAPISpec)
 	})
 
-	mux.HandleFunc("/healthz", h.Healthz)
-	mux.HandleFunc("/auth/register", h.Register)
-	mux.HandleFunc("/auth/login", h.Login)
-	mux.HandleFunc("/auth/logout", h.Logout)
-	mux.HandleFunc("/auth/validate", h.Validate)
-	mux.HandleFunc("/auth/me", h.Me)
-	mux.HandleFunc("/auth/google-login", h.GoogleLogin)
-	mux.HandleFunc("/auth/google-callback", h.GoogleCallback)
-	mux.HandleFunc("/settings/profile", h.UpdateProfile)
-	mux.HandleFunc("/settings/change-password", h.ChangePassword)
-	mux.HandleFunc("/settings/delete-account", h.DeleteAccount)
+	// Health Check endpoints
+	app.Get("/health", h.Health)
+	app.Get("/healthz", h.Healthz)
 
-	return h.cors(mux)
+	// Auth group endpoints
+	auth := app.Group("/auth")
+	auth.Post("/register", h.Register)
+	auth.Post("/login", h.Login)
+	auth.Post("/logout", h.Logout)
+	auth.Get("/validate", h.Validate)
+	auth.Get("/me", h.Me)
+	auth.Get("/google-login", h.GoogleLogin)
+	auth.Get("/google-callback", h.GoogleCallback)
+
+	// Settings group endpoints
+	settings := app.Group("/settings")
+	settings.Put("/profile", h.UpdateProfile)
+	settings.Post("/change-password", h.ChangePassword)
+	settings.Delete("/delete-account", h.DeleteAccount)
+}
+
+// Health check handler untuk /health
+func (h *Handler) Health(c fiber.Ctx) error {
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"service": "auth-service",
+		"status":  "ok",
+	})
 }

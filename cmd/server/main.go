@@ -2,9 +2,7 @@ package main
 
 import (
 	"context"
-	"errors"
 	"log"
-	"net/http"
 	"os"
 	"os/signal"
 	"strings"
@@ -14,6 +12,8 @@ import (
 	"github.com/app/monorepo/services/auth/pkg/handlers"
 	"github.com/app/monorepo/services/auth/pkg/store"
 	"github.com/app/monorepo/services/auth/pkg/tokens"
+	"github.com/gofiber/fiber/v3"
+	"github.com/gofiber/fiber/v3/middleware/cors"
 	"github.com/joho/godotenv"
 )
 
@@ -25,7 +25,7 @@ func getenv(key, fallback string) string {
 }
 
 func main() {
-	// 1. Muat file .env secara otomatis (jika ada) saat development
+	// 1. Muat file .env secara otomatis
 	if err := godotenv.Load(); err != nil {
 		_ = godotenv.Load("../../.env")
 		log.Println("Info: File .env tidak ditemukan, membaca dari OS environment variables")
@@ -53,8 +53,6 @@ func main() {
 	// 4. Formatting CORS Origins tanpa duplikasi
 	frontend := strings.TrimRight(os.Getenv("FRONTEND_URL"), "/")
 	originMap := make(map[string]bool)
-
-	// Tambahkan default localhost untuk kebutuhan lokal UI dev
 	originMap["http://localhost:3000"] = true
 
 	if frontend != "" {
@@ -94,26 +92,34 @@ func main() {
 		},
 	)
 
-	// 7. Konfigurasi Server HTTP
-	addr := ":" + getenv("AUTH_PORT", "8080")
-	srv := &http.Server{
-		Addr:              addr,
-		Handler:           h.Routes(),
-		ReadHeaderTimeout: 5 * time.Second,
-		ReadTimeout:       15 * time.Second,
-		WriteTimeout:      30 * time.Second,
-		IdleTimeout:       60 * time.Second,
-	}
+	// 7. Inisialisasi Aplikasi Fiber v3
+	app := fiber.New(fiber.Config{
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 30 * time.Second,
+		IdleTimeout:  60 * time.Second,
+	})
 
-	// 8. Jalankan Server di Goroutine terpisah
+	// 8. Middleware CORS (Harus dipasang sebelum registrasi rute)
+	app.Use(cors.New(cors.Config{
+		AllowOrigins:     origins,
+		AllowCredentials: true,
+		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+	}))
+
+	// 9. Registrasi Seluruh Rute dari Package Handlers
+	h.RegisterRoutes(app)
+
+	// 10. Jalankan Server di Goroutine Terpisah
+	addr := ":" + getenv("AUTH_PORT", "8080")
 	go func() {
-		log.Printf("Server listening on %s (env=%s)", addr, env)
-		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Fatalf("Server HTTP crash: %v", err)
+		log.Printf("Server Fiber v3 listening on %s (env=%s)", addr, env)
+		if err := app.Listen(addr); err != nil {
+			log.Printf("Server HTTP closed: %v", err)
 		}
 	}()
 
-	// 9. Graceful Shutdown listener
+	// 11. Graceful Shutdown Listener
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
@@ -123,7 +129,7 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	if err := srv.Shutdown(ctx); err != nil {
+	if err := app.ShutdownWithContext(ctx); err != nil {
 		log.Fatalf("Server dipaksa berhenti: %v", err)
 	}
 
